@@ -4,11 +4,16 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 
-contract WavePortal {
-    uint256 totalWaves;
-    uint256 private seed;
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
-    event NewWave(address indexed from, uint256 timestamp, string message);
+contract WavePortal is VRFConsumerBase {
+    uint256 totalWaves;
+
+    bytes32 private keyHash;
+    uint256 private fee;
+
+    event NewWave(address indexed from, uint256 timestamp, string message, bool isWinner);
+    event RandomNumberRequested(bytes32 indexed requestId);
 
     struct Wave {
         address waver;
@@ -18,47 +23,50 @@ contract WavePortal {
 
     Wave[] waves;
 
-    /*
-     * This is an address => uint mapping, meaning I can associate an address with a number!
-     * In this case, I'll be storing the address with the last time the user waved at us.
-     */
     mapping(address => uint256) public lastWavedAt;
+    mapping(address => string) public messageFromSender;
+    mapping(bytes32 => address) public requestIdToSender;
 
-    constructor() payable {
+    constructor(address _vrfCoordinator, address _linkToken, bytes32 _keyHash, uint256 _fee)
+        VRFConsumerBase(_vrfCoordinator, _linkToken)
+        payable 
+    {
         console.log("We have been constructed!");
-        /*
-         * Set the initial seed
-         */
-        seed = (block.timestamp + block.difficulty) % 100;
+
+        keyHash = _keyHash;
+        fee = _fee;
     }
 
-    function wave(string memory _message) public {
+    function initializeWave(string memory _message) public returns (bytes32 requestId) {
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
         /*
-         * We need to make sure the current timestamp is at least 30 seconds bigger than the last timestamp we stored
+         * We need to make sure the current timestamp is at least 2 minutes bigger than the last timestamp we stored
          */
         require(
-            lastWavedAt[msg.sender] + 30 seconds < block.timestamp,
-            "Wait 15m"
+            lastWavedAt[msg.sender] + 2 minutes < block.timestamp,
+            "Wait 2 minutes"
         );
 
+        requestId = requestRandomness(keyHash, fee);
+        requestIdToSender[requestId] = msg.sender;
+        messageFromSender[msg.sender] = _message;
+
+        emit RandomNumberRequested(requestId);
+    }
+
+    function finishWave(string memory _message, uint256 random) internal {
         /*
          * Update the current timestamp we have for the user
          */
         lastWavedAt[msg.sender] = block.timestamp;
 
         totalWaves += 1;
-        console.log("%s has waved!", msg.sender);
 
         waves.push(Wave(msg.sender, _message, block.timestamp));
 
-        /*
-         * Generate a new seed for the next user that sends a wave
-         */
-        seed = (block.difficulty + block.timestamp + seed) % 100;
+        bool isWinner = false;
 
-        if (seed <= 50) {
-            console.log("%s won!", msg.sender);
-
+        if (random <= 50) {
             uint256 prizeAmount = 0.0001 ether;
             require(
                 prizeAmount <= address(this).balance,
@@ -66,9 +74,10 @@ contract WavePortal {
             );
             (bool success, ) = (msg.sender).call{value: prizeAmount}("");
             require(success, "Failed to withdraw money from contract.");
+            isWinner = true;
         }
 
-        emit NewWave(msg.sender, block.timestamp, _message);
+        emit NewWave(msg.sender, block.timestamp, _message, isWinner);
     }
 
     function getAllWaves() public view returns (Wave[] memory) {
@@ -77,5 +86,16 @@ contract WavePortal {
 
     function getTotalWaves() public view returns (uint256) {
         return totalWaves;
+    }
+
+    /**
+     * Callback function used by VRF Coordinator
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+        uint256 randomResult = (randomness % 100) + 1;
+        address requestSender = requestIdToSender[requestId];
+        string memory pendingMessage = messageFromSender[requestSender];
+
+        finishWave(pendingMessage, randomResult);
     }
 }

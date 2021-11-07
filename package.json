@@ -18,6 +18,8 @@
     "hardhat": "^2.6.7"
   },
   "dependencies": {
+    "@appliedblockchain/chainlink-plugins-fund-link": "0.0.3",
+    "@chainlink/contracts": "^0.2.2",
     "dotenv": "^10.0.0"
   }
 }
