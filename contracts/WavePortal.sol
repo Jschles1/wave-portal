@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -31,8 +29,6 @@ contract WavePortal is VRFConsumerBase, Ownable {
         VRFConsumerBase(_vrfCoordinator, _linkToken)
         payable 
     {
-        console.log("We have been constructed!");
-
         keyHash = _keyHash;
         fee = _fee;
     }
