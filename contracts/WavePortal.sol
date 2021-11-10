@@ -5,15 +5,12 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract WavePortal is VRFConsumerBase {
+contract WavePortal is VRFConsumerBase, Ownable {
     uint256 totalWaves;
-
     bytes32 private keyHash;
     uint256 private fee;
-
-    event NewWave(address indexed from, uint256 timestamp, string message, bool isWinner);
-    event RandomNumberRequested(bytes32 indexed requestId);
 
     struct Wave {
         address waver;
@@ -26,6 +23,9 @@ contract WavePortal is VRFConsumerBase {
     mapping(address => uint256) public lastWavedAt;
     mapping(address => string) public messageFromSender;
     mapping(bytes32 => address) public requestIdToSender;
+
+    event NewWave(address indexed from, uint256 timestamp, string message, bool isWinner);
+    event RandomNumberRequested(bytes32 indexed requestId);
 
     constructor(address _vrfCoordinator, address _linkToken, bytes32 _keyHash, uint256 _fee)
         VRFConsumerBase(_vrfCoordinator, _linkToken)
@@ -52,6 +52,17 @@ contract WavePortal is VRFConsumerBase {
         messageFromSender[msg.sender] = _message;
 
         emit RandomNumberRequested(requestId);
+    }
+
+    /**
+     * Callback function used by VRF Coordinator
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+        uint256 randomResult = (randomness % 100) + 1;
+        address requestSender = requestIdToSender[requestId];
+        string memory pendingMessage = messageFromSender[requestSender];
+
+        finishWave(pendingMessage, randomResult);
     }
 
     function finishWave(string memory _message, uint256 random) internal {
@@ -88,14 +99,8 @@ contract WavePortal is VRFConsumerBase {
         return totalWaves;
     }
 
-    /**
-     * Callback function used by VRF Coordinator
-     */
-    function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
-        uint256 randomResult = (randomness % 100) + 1;
-        address requestSender = requestIdToSender[requestId];
-        string memory pendingMessage = messageFromSender[requestSender];
-
-        finishWave(pendingMessage, randomResult);
+    function resetWaves() public onlyOwner {
+        delete waves;
+        totalWaves = 0;
     }
 }
