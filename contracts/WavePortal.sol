@@ -33,7 +33,7 @@ contract WavePortal is VRFConsumerBase, Ownable {
         fee = _fee;
     }
 
-    function initializeWave(string memory _message) public returns (bytes32 requestId) {
+    function initializeWave(string memory _message) public {
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK - fill contract with faucet");
         /*
          * We need to make sure the current timestamp is at least 2 minutes bigger than the last timestamp we stored
@@ -43,7 +43,7 @@ contract WavePortal is VRFConsumerBase, Ownable {
             "Wait 2 minutes"
         );
 
-        requestId = requestRandomness(keyHash, fee);
+        bytes32 requestId = requestRandomness(keyHash, fee);
         requestIdToSender[requestId] = msg.sender;
         messageFromSender[msg.sender] = _message;
 
