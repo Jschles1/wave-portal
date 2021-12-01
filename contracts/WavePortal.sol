@@ -22,7 +22,7 @@ contract WavePortal is VRFConsumerBase, Ownable {
     mapping(address => string) public messageFromSender;
     mapping(bytes32 => address) public requestIdToSender;
 
-    event NewWave(address indexed from, uint256 timestamp, string message, bool isWinner);
+    event NewWave(address indexed from, uint256 timestamp, string message, uint256 random);
     event RandomNumberRequested(bytes32 indexed requestId);
 
     constructor(address _vrfCoordinator, address _linkToken, bytes32 _keyHash, uint256 _fee)
@@ -71,8 +71,6 @@ contract WavePortal is VRFConsumerBase, Ownable {
 
         waves.push(Wave(msg.sender, _message, block.timestamp));
 
-        bool isWinner = false;
-
         if (random <= 50) {
             uint256 prizeAmount = 0.0001 ether;
             require(
@@ -81,10 +79,9 @@ contract WavePortal is VRFConsumerBase, Ownable {
             );
             (bool success, ) = (msg.sender).call{value: prizeAmount}("");
             require(success, "Failed to withdraw money from contract.");
-            isWinner = true;
         }
 
-        emit NewWave(msg.sender, block.timestamp, _message, isWinner);
+        emit NewWave(msg.sender, block.timestamp, _message, random);
     }
 
     function getAllWaves() public view returns (Wave[] memory) {
