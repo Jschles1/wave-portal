@@ -58,18 +58,18 @@ contract WavePortal is VRFConsumerBase, Ownable {
         address requestSender = requestIdToSender[requestId];
         string memory pendingMessage = messageFromSender[requestSender];
 
-        finishWave(pendingMessage, randomResult);
+        finishWave(requestSender, pendingMessage, randomResult);
     }
 
-    function finishWave(string memory _message, uint256 random) internal {
+    function finishWave(address _sender, string memory _message, uint256 random) internal {
         /*
          * Update the current timestamp we have for the user
          */
-        lastWavedAt[msg.sender] = block.timestamp;
+        lastWavedAt[_sender] = block.timestamp;
 
         totalWaves += 1;
 
-        waves.push(Wave(msg.sender, _message, block.timestamp));
+        waves.push(Wave(_sender, _message, block.timestamp));
 
         if (random <= 50) {
             uint256 prizeAmount = 0.0001 ether;
@@ -77,11 +77,11 @@ contract WavePortal is VRFConsumerBase, Ownable {
                 prizeAmount <= address(this).balance,
                 "Trying to withdraw more money than they contract has."
             );
-            (bool success, ) = (msg.sender).call{value: prizeAmount}("");
+            (bool success, ) = (_sender).call{value: prizeAmount}("");
             require(success, "Failed to withdraw money from contract.");
         }
 
-        emit NewWave(msg.sender, block.timestamp, _message, random);
+        emit NewWave(_sender, block.timestamp, _message, random);
     }
 
     function getAllWaves() public view returns (Wave[] memory) {
